@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CadeBuffet</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css">
+</head>
+<body>
+  <div id="app" class="section">
+    <div class="modal" v-if="isActive" v-bind:class="{ 'is-active': isActive }">
+      <div class="modal-background"></div>
+      <div class="modal-content">
+        <form @submit.prevent="submitForm">
+          <div class="field">
+            <label class="label">Data</label>
+            <div class="control">
+              <input class="input" type="date" v-model="formData.date" required>
+            </div>
+          </div>
+        
+          <div class="field">
+            <label class="label">Quantidade de Pessoas</label>
+            <div class="control">
+              <input class="input" type="number" v-model="formData.peopleCount" min="1" required>
+            </div>
+          </div>
+        
+          <div class="field">
+            <div class="control">
+              <button class="button is-link">Submit</button>
+            </div>
+          </div>
+        </form>
+        <div v-if="available === true  " class="notification is-primary">
+          Evento com disponibilidade! Favor entrar em contato com o buffet
+        </div>
+        <div v-else-if="available === false && reason " class="notification is-warning">
+          Evento nao disponivel!
+          Motivo: {{ reason }}
+        </div>
+        <div v-else-if="error" class="notification is-danger" >
+          Erro ao verifcar disponibilidade!
+          Motivo: {{error}}
+        </div>
+
+      </div>
+      <button class="modal-close is-large" aria-label="close" v-on:click="closeModal()"></button>
+    </div>
+
+    <div class="box" v-if="currentPage === 'home'">
+      <h1 class="title">Buffets cadastrados</h1>
+
+      <div class="content">
+        <input class="input" style="max-width: 300px;" type="text" v-model="searchText" placeholder="Entre um nome de buffet">
+      </div>
+
+      <div v-if="listResult.length <= 0" class="notification">
+        Nenhum buffet encontrado
+      </div>
+
+      <div class="grid is-column-gap-11">
+        <div class="cell" v-for="buffet in listResult">
+          <button class="button" style="border: none" v-on:click="goBuffet(buffet.id)">
+          <div class="card has-text-left">
+            <div class="card-content">
+              <div class="media">
+                <div class="media-content">
+                  <p class="title is-4">{{buffet.brand_name}}</p>
+                  <p class="subtitle is-6">{{buffet.city}} | {{buffet.state_code}}</p>
+                </div>
+              </div>
+      
+              <div class="content">
+                {{buffet.description}}
+                <br>
+                <strong>Meios de pagamento aceitos:</strong>
+                <div class="tags"> 
+                  <span v-for="methods in buffet.payment_methods" class="tag">
+                    {{methods.method}}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="box" v-if="currentPage === 'buffet'" >
+      <div class="content">
+        <button class="button is-sucess" v-on:click="goHome()">Voltar</button>
+      </div>
+      <div class="columns">
+        <div class="column" id="buffet-details" >
+          <div class="card-content" >
+            <div class="media" >
+              <div class="media-content" >
+                <p class="title" > {{detailedBuffet.brand_name}} </p>
+                <p class="subtitle" > {{detailedBuffet.description}} </p>
+              </div>
+            </div>
+            <div class="content">
+              <address>
+                Contato: {{ detailedBuffet.phone_number }} <br>
+                Email: {{detailedBuffet.email}} <br>
+                Endereço: {{ detailedBuffet.address}}, {{detailedBuffet.district}}, {{detailedBuffet.city}} | {{ detailedBuffet.state_code }} <br>
+                CEP: {{detailedBuffet.zip_code}}
+              </address>
+              <div class="box" >
+                <strong>Meios de pagamento aceitos:</strong>
+                <div class="tags"> 
+                  <span v-for="methods in detailedBuffet.payment_methods" class="tag">
+                    {{methods.method}}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="column" id="event-list" >
+          <div class="content" >
+            <h3> Eventos Ativos: </h3>
+            <button class="button" style="border: none"  v-for="event in detailedBuffet.events" v-on:click="openModal(event.id)">
+              <div class="card has-text-left">
+                <div class="card-content">
+                  <div class="media">
+                    <div class="media-content">
+                    <p>{{event.name}}<br>
+                    Tipo: {{event.event_category.category}} <br>
+                    Sobre: {{event.description}}<br>
+                    Minimo: {{event.min_capacity}} pessoas<br> 
+                    Maximo: {{event.max_capacity}} pessoas<br>
+                    Duraçao: {{event.default_duration}} minutos </p>
+                    <p v-if="event.exclusive_address"> Realizado somente no Endereço do buffet</p>
+                    <p v-else >Pode ser realizado em outros endereços</p>
+                    <div class="tags" >
+                      Incluso: 
+                      <span v-for="feature in event.features" class="tag">
+                        {{feature.feature}}
+                      </span>
+                    </div>
+                    <p>Menu: {{event.menu}}</p>
+                    <div class="box" >
+                      <p v-if="event.event_prices.length == 0" >Sem preços definidos</p>
+                      <div v-for="price in event.event_prices" class="content" >
+                        <p v-if="price.price_type === 'standard'">
+                          Valor dias de Semana
+                        </p>
+                        <p v-else-if="price.price_type === 'special' " >
+                          Valor finais de semana ou feriado
+                        </p>
+                        <p>
+                          Valor: {{price.base_value}} <br>
+                          Adicional por pessoa: {{price.extra_per_person}}<br>
+                          Adicional por hora: {{price.extra_per_hour}}
+                        </p>
+                      </div>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
